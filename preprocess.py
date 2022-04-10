@@ -12,10 +12,6 @@ from functools import partial
 import numpy as np
 import torch.utils.data as data
 
-import sys
-sys.path.append(
-    "/Users/daisy/CipherClassification/CryptoClassificationNewBranch")
-
 
 def file2cipher(file_dir, targetDir, encrypt, label, file_percent=1):
     """
@@ -32,7 +28,7 @@ def file2cipher(file_dir, targetDir, encrypt, label, file_percent=1):
 
     for root, dirs, files in os.walk(file_dir):
         for file in files:
-            with open(os.path.join(root,file), "rb") as f:
+            with open(os.path.join(root, file), "rb") as f:
                 line = f.readlines()
                 # join line
                 lines = b''.join(line)
@@ -43,7 +39,6 @@ def file2cipher(file_dir, targetDir, encrypt, label, file_percent=1):
                 if count == file_num:
                     return count
     return count
-
 
 
 def bitcount(file_path, bitCountWise=8):
@@ -97,13 +92,14 @@ def getFeature(file_dir, function, inputSize):
         # apply the function
         feature = function(file)
         feature = feature[0:(len(feature) // inputSize ** 2) * inputSize ** 2]
-        feature_np = np.array(feature).reshape(-1, inputSize, inputSize)
+        feature_np = np.array(feature, dtype=np.float32).reshape(-1, inputSize, inputSize)
         feature_nparr.append(feature_np)
 
     file_array = os.listdir(file_dir)
     args = [file_dir + "/" + file for file in file_array]
     # pool.map(process, args)
-    map(process, args)
+    for f in args:
+        process(f)
     return np.concatenate(feature_nparr, axis=0)
 
 
@@ -112,50 +108,52 @@ class DataSet(data.Dataset):
     shape: (num * 1 * inputSize * inputSize)
     """
 
-    def __init__(self, label, feature):
+    def __init__(self, label, feature_np):
         super(DataSet, self).__init__()
-        self.feature_tensor = torch.from_numpy(feature).unsqueeze(1)
+        self.feature_np = feature_np
         self.label = label
 
     def __len__(self):
-        return self.feature_tensor.shape[0]
+        return self.feature_np.shape[0]
 
     def __getitem__(self, index):
         if torch.cuda.is_available():
-            return self.feature_tensor[index].cuda(), self.label[index].cuda()
+            return torch.from_numpy(self.feature_np[index]).unsqueeze(0).cuda(), torch.tensor(self.label, dtype=torch.long).cuda()
         else:
-            return self.feature_tensor[index], torch.Tensor(self.label)
+            return torch.from_numpy(self.feature_np[index]).unsqueeze(0), torch.tensor(self.label, dtype=torch.long)
 
 
 if __name__ == '__main__':
-    wiki_zh = "/root/autodl-tmp/data/wiki_zh"
-    imagenet = "/root/autodl-tmp/data/imagenet100"
-    voice = "/root/autodl-tmp/data/voice"
+    # wiki_zh = "/root/autodl-tmp/data/wiki_zh"
+    # imagenet = "/root/autodl-tmp/data/imagenet100"
+    # voice = "/root/autodl-tmp/data/voice"
 
-    cipherDir_aes = "/root/autodl-tmp/cipher/aes"
-    cipherDir_des = "/root/autodl-tmp/cipher/des3"
+    # cipherDir_aes = "/root/autodl-tmp/cipher/aes"
+    # cipherDir_des = "/root/autodl-tmp/cipher/des3"
+    voice = "/Users/daisy/Downloads/voice"
+    cipherDir_aes = "/Users/daisy/Downloads/cipher_aes"
+    cipherDir_des = "/Users/daisy/Downloads/cipher_des"
 
     aes_ecb = aes.AES_ECB()
     des3_ecb = des.TDES_ECB()
 
-    count = 0
-    for dir in os.listdir(wiki_zh):
-        count = file2cipher(wiki_zh + "/" + dir, cipherDir_des,
-                            des3_ecb.encrypt, "wiki_DES3_ECB", count)
-    for dir in os.listdir(imagenet):
-        count = file2cipher(imagenet + "/" + dir, cipherDir_des,
-                            des3_ecb.encrypt, "imagenet_DES3_ECB", count)
-    file2cipher(voice, cipherDir_des, des3_ecb.encrypt,
-                "voice_DES3_ECB", count)
+    # count = 0
+    # for dir in os.listdir(wiki_zh):
+    #     count = file2cipher(wiki_zh + "/" + dir, cipherDir_des,
+    #                         des3_ecb.encrypt, "wiki_DES3_ECB", count)
+    # for dir in os.listdir(imagenet):
+    #     count = file2cipher(imagenet + "/" + dir, cipherDir_des,
+    #                         des3_ecb.encrypt, "imagenet_DES3_ECB", count)
+    file2cipher(voice, cipherDir_des, des3_ecb.encrypt, "voice_DES3_ECB", 0.1)
 
-    count = 0
-    for dir in os.listdir(wiki_zh):
-        count = file2cipher(wiki_zh + "/" + dir, cipherDir_aes,
-                            aes_ecb.encrypt, "wiki_AES_ECB", count)
-    for dir in os.listdir(imagenet):
-        count = file2cipher(imagenet + "/" + dir, cipherDir_aes,
-                            aes_ecb.encrypt, "imagenet_AES_ECB", count)
-    file2cipher(voice, cipherDir_aes, aes_ecb.encrypt, "voice_AES_ECB", count)
+    # count = 0
+    # for dir in os.listdir(wiki_zh):
+    #     count = file2cipher(wiki_zh + "/" + dir, cipherDir_aes,
+    #                         aes_ecb.encrypt, "wiki_AES_ECB", count)
+    # for dir in os.listdir(imagenet):
+    #     count = file2cipher(imagenet + "/" + dir, cipherDir_aes,
+    #                         aes_ecb.encrypt, "imagenet_AES_ECB", count)
+    file2cipher(voice, cipherDir_aes, aes_ecb.encrypt, "voice_AES_ECB", 0.1)
 
     # np_file = "/root/auto-tmp/feature"
     # t1 = time.time()

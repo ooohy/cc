@@ -42,7 +42,6 @@ def file2cipher(file_dir, targetDir, encrypt, label, file_percent=1):
     return count
 
 
-# @ray.remote
 def bitcount(file_path, bitCountWise=8):
     with open(file_path, 'rb') as f:
         count_arr = []

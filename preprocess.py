@@ -11,6 +11,7 @@ from multiprocessing import Pool
 from functools import partial
 import numpy as np
 import torch.utils.data as data
+import ray
 
 
 def file2cipher(file_dir, targetDir, encrypt, label, file_percent=1):
@@ -41,6 +42,7 @@ def file2cipher(file_dir, targetDir, encrypt, label, file_percent=1):
     return count
 
 
+# @ray.remote
 def bitcount(file_path, bitCountWise=8):
     with open(file_path, 'rb') as f:
         count_arr = []
@@ -79,6 +81,26 @@ def getFeature_mp(file_dir, function, inputSize):
     pool.close()
     pool.join()
     return np.concatenate(feature_nparr, axis=0)
+
+
+def getFeature_ray(file_dir, function, inputSize):
+    """
+    shape : (num * inputSize * inputSize)
+    function : bitcount etc.
+    """
+
+    @ray.remote
+    def process(file):
+        # apply the function
+        feature = function(file)
+        feature = feature[0:(len(feature) // inputSize ** 2) * inputSize ** 2]
+        feature_np = np.array(feature, dtype=np.float32).reshape(-1, inputSize, inputSize)
+        return feature_np
+
+    file_array = [file_dir + "/" + file for file in os.listdir(file_dir)]
+
+    feature = [process.remote(file) for file in file_array]
+    return np.concatenate(ray.get(feature), axis=0)
 
 
 def getFeature(file_dir, function, inputSize):

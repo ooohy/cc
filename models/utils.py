@@ -2,27 +2,33 @@ import torch
 import torch.nn as nn
 import os
 from preprocess import DataSet
+from preprocess import DataSet_lazyloading
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset, DataLoader
 import torch.utils.data.dataset as dataset
+import gc
+import time
 
 
-def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimizer_name="SGD", lr=0.05, momentum=0.8, modelPath=None):
+def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimizer_name="SGD", lr=0.05, momentum=0.8, modelPath=None, lazyloading=False):
     if criterion_name == "CrossEntropyLoss":
         criterion = nn.CrossEntropyLoss()
     elif criterion_name == "L1Loss":
         criterion = nn.L1Loss()
 
     if optimizer_name == "SGD":
-        optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum)
+        optimizer = torch.optim.SGD(
+            model.parameters(), lr=lr, momentum=momentum)
     elif optimizer_name == "Adam":
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
+    last_loss = 0
     for round in range(epoch):  # loop over the dataset multiple times
         running_loss = 0.0
         for i, data in enumerate(dataloader, 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
+            inputs = inputs.float()
 
             # zero the parameter gradients
             optimizer.zero_grad()
@@ -33,41 +39,49 @@ def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimi
             loss.backward()
             optimizer.step()
 
+           # print statistics
             running_loss += loss.item()
-            running_loss = 0.0
-            # print statistics
-            print_static(round, i, running_loss)
+            if i % 2000 == 1999:    # print every 2000 mini-batches
+                print('[%d, %5d] loss: %.3f' %
+                      (round, i + 1, running_loss / 2000))
+                last_loss = running_loss
+                running_loss = 0.0
     if modelPath:
         torch.save(model, modelPath)
+    if lazyloading == True:
+        return last_loss
 
 
-def print_static(round, i, running_loss):
-    if i % 2000 == 1999:    # print every 2000 mini-batches
-        print('[%d, %5d] loss: %.3f' %
-            (round, i + 1, running_loss / 2000))
-
-
-def lazyLoadAndTrain(train, feature_dir_dict, piece_num, dataloader_partial, epoch=10, criterion_name="CrossEntropyLoss", optimizer_name="SGD", lr=0.05, momentum=0.8, modelPath=None):
+def lazyLoadAndTrain(model, train_partial, batchsize, num_workers ,feature_dir_dict, piece_num=3,epoch=10, modelPath=None):
+    """
+    dataloader_partial : shuffle has been fixed
+    """
     feature_iter_dict = dict()
     for key, value in feature_dir_dict.items():
-        feature_iter_dict[key] = iter([value + "/" + file for file in os.listdir(feature_dir_dict[key])])
-        
+        feature_iter_dict[key] = iter(
+            [value + "/" + file for file in os.listdir(feature_dir_dict[key])])
+
     for round in range(epoch):
-        for piece in piece_num:
+        for piece in range(piece_num):
             dataset_array = []
             for key, value in feature_iter_dict.items():
-                dataset_array.append(DataSet(int(key), next(value)))
+                dataset_array.append(DataSet_lazyloading(int(key), next(value)))
                 dataset_piece = dataset.ConcatDataset(dataset_array)
-            dataloader_partial(dataset_piece)
-            train(model, dataloader_partial, epoch=1, criterion_name=criterion_name, optimizer_name=optimizer_name, lr=lr, momentum=momentum, modelPath=modelPath)
+            dataloader = DataLoader(dataset_piece, shuffle=True, batch_size=batchsize, num_workers=num_workers)
+            loss = train_partial(model, dataloader, epoch=1, modelPath=None, lazyloading=True)
 
-            
-
+            # print Loss
+            print('[%d, %2d] loss: %.3f' %(round, piece, loss/ 2000))
+            # print time
+            print("  >>  ", time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
+            # clear memory
+            del dataset_array, dataset_piece, dataloader
+            gc.collect()
 
     torch.save(model, modelPath)
 
 
-def val(model, dataloader) :
+def val(model, dataloader):
     correct = 0
     total = 0
     with torch.no_grad():
@@ -79,7 +93,8 @@ def val(model, dataloader) :
             correct += (predict == labels).sum().item()
     return correct / total
 
-def batchVal(model, dataloader) :
+
+def batchVal(model, dataloader):
     correct = 0
     total = dataloader.__len__()
     pre = torch.empty()
@@ -90,7 +105,6 @@ def batchVal(model, dataloader) :
             _, predict_tensor = torch.max(outputs.data, 1)
             _, predict = torch.mode(predict_tensor)
             correct += (predict == labels)
-
 
 
 def classifier(model, dataloader):

@@ -1,5 +1,4 @@
 from pydoc import describe
-from sys import path_hooks
 from cipher import aes
 from cipher import des
 import torch
@@ -14,8 +13,12 @@ import numpy as np
 import torch.utils.data as data
 import ray
 from joblib import Parallel, delayed
-import pandas as pd
-import math
+import random
+import string
+from models import ResNet
+from torch.utils.data import dataset
+from torch.utils.data import DataLoader
+
 
 
 def file2cipher(file_dir, targetDir, encrypt, label, file_percent=1):
@@ -27,23 +30,21 @@ def file2cipher(file_dir, targetDir, encrypt, label, file_percent=1):
     # count filenum in file_dir
     file_num = 0
     count = 0
-    for root, dirs, files in os.walk(file_dir):
-        file_num += len(files)
-    file_num = int(file_num * file_percent)
-
+    file_array = []
     for root, dirs, files in os.walk(file_dir):
         for file in files:
-            with open(os.path.join(root, file), "rb") as f:
-                line = f.readlines()
-                # join line
-                lines = b''.join(line)
-                cipher = encrypt(lines)
-                with open(targetDir + '/' + label + "__" + str(count) + ".cipher", 'wb') as f:
-                    f.write(cipher)
-                count += 1
-                if count == file_num:
-                    return count
-    return count
+            file_array.append(os.path.join(root, file))
+    file_array = file_array[:int(len(file_array) * file_percent)]
+
+    def process(file):
+        with open(file, "rb") as f:
+            line = f.readlines()
+            # join line
+            lines = b''.join(line)
+            cipher = encrypt(lines)
+            with open(targetDir + '/' + label + "__" + generate_random_num(10) + ".cipher", 'wb') as f:
+                f.write(cipher)
+    Parallel(n_jobs=24)(delayed(process)(file) for file in file_array)
 
 
 def bitcount(file_path, bitCountWise=8):
@@ -73,7 +74,7 @@ def getFeature_mp(file_dir, function, inputSize):
         # apply the function
         feature = function(file)
         feature = feature[0:(len(feature) // inputSize ** 2) * inputSize ** 2]
-        feature_np = np.array(feature).reshape(-1, inputSize, inputSize)
+        feature_np = np.array(feature, detype=np.int8).reshape(-1, inputSize, inputSize)
         feature_nparr.append(feature_np)
 
     file_array = os.listdir(file_dir)
@@ -97,7 +98,7 @@ def getFeature_ray(file_dir, function, inputSize):
         # apply the function
         feature = function(file)
         feature = feature[0:(len(feature) // inputSize ** 2) * inputSize ** 2]
-        feature_np = np.array(feature, dtype=np.float32).reshape(-1, inputSize, inputSize)
+        feature_np = np.array(feature, dtype=np.int8).reshape(-1, inputSize, inputSize)
         return feature_np
 
     file_array = [file_dir + "/" + file for file in os.listdir(file_dir)]
@@ -117,7 +118,7 @@ def getFeature(file_dir, function, inputSize):
         # apply the function
         feature = function(file)
         feature = feature[0:(len(feature) // inputSize ** 2) * inputSize ** 2]
-        feature_np = np.array(feature, dtype=np.float32).reshape(-1, inputSize, inputSize)
+        feature_np = np.array(feature, dtype=np.int8).reshape(-1, inputSize, inputSize)
         feature_nparr.append(feature_np)
 
     file_array = os.listdir(file_dir)
@@ -127,34 +128,25 @@ def getFeature(file_dir, function, inputSize):
         process(f)
     return np.concatenate(feature_nparr, axis=0)
 
-
-def getFeature_joblib(file_dir, function, inputSize, feature_dir=None, pieces=16):
+def getFeature_joblib(file_dir, function, inputSize):
     """
     shape : (num * inputSize * inputSize)
     function : bitcount etc.
-    if you cut feature into pieces ,please make sure they are the same size between calogories
     """
     def process(file):
         # apply the function
         feature = function(file)
-        inputSize_2 = inputSize ** 2
-        feature = feature[0:(len(feature) // inputSize_2) * inputSize_2]
-        feature_df = pd.DataFrame(np.array(feature, dtype=np.float32).reshape(-1, inputSize_2))
-            
-        return feature_df
-    
-    def pd2csv(index):
-        feature.iloc[index * every_epoch_num:(index + 1) * every_epoch_num].to_csv(feature_dir + "/" + "feature_slice_" + str(index) + ".csv", index=False)
+        feature = feature[0:(len(feature) // inputSize ** 2) * inputSize ** 2]
+        feature_np = np.array(feature, dtype=np.int8).reshape(-1, inputSize, inputSize)
+        return feature_np
 
-    args = [file_dir + "/" + file for file in os.listdir(file_dir)]
+    file_array = os.listdir(file_dir)
+    args = [file_dir + "/" + file for file in file_array]
+
     
-    feature_pdarr = Parallel(n_jobs=12)(delayed(process)(file) for file in args)
-    if feature_dir is None:
-        return pd.concat(feature_pdarr, axis=0)
-    else:
-        feature = pd.concat(feature_pdarr, axis=0)
-        every_epoch_num = math.floor(len(feature) / pieces)
-        Parallel(n_jobs=12)(delayed(pd2csv)(index) for index in range(pieces))
+    feature_nparr = Parallel(n_jobs=23)(delayed(process)(file) for file in args)
+    return np.concatenate(feature_nparr, axis=0)
+
 
 class DataSet(data.Dataset):
     """
@@ -176,16 +168,21 @@ class DataSet(data.Dataset):
             return torch.from_numpy(self.feature_np[index]).unsqueeze(0), torch.tensor(self.label, dtype=torch.long)
 
 
-if __name__ == '__main__':
-    # wiki_zh = "/root/autodl-tmp/data/wiki_zh"
-    # imagenet = "/root/autodl-tmp/data/imagenet100"
-    # voice = "/root/autodl-tmp/data/voice"
+def generate_random_num(length):
+    str_list=[random.choice(string.digits+string.ascii_letters) for i in range(length)]
+    random_str="".join(str_list)
+    return random_str
 
-    # cipherDir_aes = "/root/autodl-tmp/cipher/aes"
-    # cipherDir_des = "/root/autodl-tmp/cipher/des3"
-    voice = "/Users/daisy/Downloads/voice"
-    cipherDir_aes = "/Users/daisy/Downloads/cipher_aes"
-    cipherDir_des = "/Users/daisy/Downloads/cipher_des"
+if __name__ == '__main__':
+    wiki_zh = "/root/autodl-tmp/data/wiki_zh"
+    imagenet = "/root/autodl-tmp/data/imagenet100"
+    voice = "/root/autodl-tmp/data/voice"
+
+    cipherDir_aes = "/root/autodl-tmp/cipher/aes_mini"
+    cipherDir_des = "/root/autodl-tmp/cipher/des3_mini"
+    # voice = "/Users/daisy/Downloads/voice"
+    # cipherDir_aes = "/Users/daisy/Downloads/cipher_aes"
+    # cipherDir_des = "/Users/daisy/Downloads/cipher_des"
 
     # aes_ecb = aes.AES_ECB()
     # des3_ecb = des.TDES_ECB()
@@ -197,7 +194,9 @@ if __name__ == '__main__':
     # for dir in os.listdir(imagenet):
     #     count = file2cipher(imagenet + "/" + dir, cipherDir_des,
     #                         des3_ecb.encrypt, "imagenet_DES3_ECB", count)
-    # file2cipher(voice, cipherDir_des, des3_ecb.encrypt, "voice_DES3_ECB", 0.1)
+    # file2cipher(wiki_zh, cipherDir_des, des3_ecb.encrypt, "wiki_DES3_ECB", 0.8)
+    # file2cipher(imagenet, cipherDir_des, des3_ecb.encrypt, "imagenet_DES3_ECB", 0.08)
+    # file2cipher(voice, cipherDir_des, des3_ecb.encrypt, "voice_DES3_ECB", 0.8)
 
     # count = 0
     # for dir in os.listdir(wiki_zh):
@@ -206,7 +205,9 @@ if __name__ == '__main__':
     # for dir in os.listdir(imagenet):
     #     count = file2cipher(imagenet + "/" + dir, cipherDir_aes,
     #                         aes_ecb.encrypt, "imagenet_AES_ECB", count)
-    # file2cipher(voice, cipherDir_aes, aes_ecb.encrypt, "voice_AES_ECB", 0.1)
+    # file2cipher(wiki_zh, cipherDir_aes, aes_ecb.encrypt, "wiki_AES_ECB", 0.8)
+    # file2cipher(imagenet, cipherDir_aes, aes_ecb.encrypt, "imagenet_AES_ECB", 0.08)
+    # file2cipher(voice, cipherDir_aes, aes_ecb.encrypt, "voice_AES_ECB", 0.8)
 
     # np_file = "/root/auto-tmp/feature"
     # t1 = time.time()
@@ -214,5 +215,24 @@ if __name__ == '__main__':
     # print(time.time() - t1)
     # data = DataSet(0, np_file)
 
-    feature_dir = "/Users/daisy/Downloads/feature"
-    getFeature_joblib(cipherDir_aes, bitcount, 224, feature_dir)
+    # feature prepare
+    print("start preprocess at:", time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
+
+    # cipherDir_aes = "/Users/daisy/Downloads/cipher_aes"
+    # cipherDir_des = "/Users/daisy/Downloads/cipher_des"
+    cipherDir_aes = "/root/autodl-tmp/cipher/aes_mini"
+    cipherDir_des = "/root/autodl-tmp/cipher/des3_mini"
+    # cipherDir_aes = "/root/testdata/aes"
+    # cipherDir_des = "/root/testdata/des"
+    # featureDir_des = "/root/autodl-tmp/feature/des3_mini_feature"
+    # featureDir_aes = "/root/autodl-tmp/feature/aes_mini_feature"
+    featureDir_dataloader_mini_pytorch = "/root/autodl-tmp/feature/feature_dataloader_mini"
+
+
+    aes_dataset = DataSet(0, getFeature_joblib(cipherDir_aes, bitcount, 224))    
+    des3_dataset = DataSet(1, getFeature_joblib(cipherDir_des, bitcount, 224))
+    trainDataset = dataset.ConcatDataset([aes_dataset, des3_dataset])
+    dataloader = DataLoader(trainDataset, batch_size=256, shuffle=True, num_workers=12)
+    torch.save(dataloader, featureDir_dataloader_mini_pytorch)
+    print("finish preprocess at:", time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
+

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 
 # 定义make_layer
-def make_layer18(in_channel, out_channel, block_num, stride=1):
+def make_layer(in_channel, out_channel, block_num, stride=1):
     shortcut = nn.Sequential(
         nn.Conv2d(in_channel, out_channel, 1, stride),  # 尺寸不变
         nn.BatchNorm2d(out_channel)
@@ -14,19 +14,6 @@ def make_layer18(in_channel, out_channel, block_num, stride=1):
 
     for i in range(1, block_num):
         layers.append(ResBlock18(out_channel, out_channel))
-    return nn.Sequential(*layers)
-
-
-def make_layer50(in_channel, out_channel, block_num, stride=1):
-    shortcut = nn.Sequential(
-        nn.Conv2d(in_channel, out_channel, 1, stride),  # 尺寸不变
-        nn.BatchNorm2d(out_channel)
-    )
-    layers = list()
-    layers.append(ResBlock50(in_channel, out_channel, stride, shortcut))
-
-    for i in range(1, block_num):
-        layers.append(ResBlock50(out_channel, out_channel))
     return nn.Sequential(*layers)
 
 
@@ -53,7 +40,6 @@ class ResBlock50(nn.Module):
     def __init__(self, in_channel, out_channel, stride=1, shortcut=None):
         super(ResBlock50, self).__init__()
         self.left = nn.Sequential(
-            nn.Conv2d(in_channel, out_channel, 1, stride, 1, bias=False),
             nn.Conv2d(in_channel, out_channel, 3, stride, 1, bias=False),
             nn.BatchNorm2d(out_channel),
             nn.ReLU(inplace=True),
@@ -85,10 +71,10 @@ class ResNet18(nn.Module):
             # nn.MaxPool2d(3, 2, 1)
             nn.MaxPool2d(kernel_size=2)
         )
-        self.layer1 = make_layer18(64, 64, 2, 2)  # 7*7
-        self.layer2 = make_layer18(64, 128, 2, 2)  #
-        self.layer3 = make_layer18(128, 256, 2, 2)  # stride = 2
-        self.layer4 = make_layer18(256, 512, 2)  # stride = 2
+        self.layer1 = make_layer(64, 64, 2, 2)  # 7*7
+        self.layer2 = make_layer(64, 128, 2, 2)  #
+        self.layer3 = make_layer(128, 256, 2, 2)  # stride = 2
+        self.layer4 = make_layer(256, 512, 2)  # stride = 2
         # self.avg = nn.AvgPool2d(4)  # 平均化
         self.avg = nn.AdaptiveAvgPool2d(output_size=(1, 1))
         self.classifier = nn.Linear(512, num_classes)  # 全连接
@@ -105,19 +91,19 @@ class ResNet18(nn.Module):
         return out
 
 class ResNet50(nn.Module):
-    def __init__(self, num_classes=2, input_channels=1):
+    def __init__(self, num_classes=2):
         super(ResNet18, self).__init__()
         self.pre = nn.Sequential(  # 第一层
-            nn.Conv2d(input_channels, 64, kernel_size=7, stride=1, padding=3, bias=False),
+            nn.Conv2d(1, 64, kernel_size=7, stride=1, padding=3, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(True),
             # nn.MaxPool2d(3, 2, 1)
             nn.MaxPool2d(kernel_size=2)
         )
-        self.layer1 = make_layer18(64, 64, 2, 2)  # 7*7
-        self.layer2 = make_layer18(64, 128, 2, 2)  #
-        self.layer3 = make_layer18(128, 256, 2, 2)  # stride = 2
-        self.layer4 = make_layer18(256, 512, 2)  # stride = 2
+        self.layer1 = make_layer(64, 64, 2, 2)  # 7*7
+        self.layer2 = make_layer(64, 128, 2, 2)  #
+        self.layer3 = make_layer(128, 256, 2, 2)  # stride = 2
+        self.layer4 = make_layer(256, 512, 2)  # stride = 2
         # self.avg = nn.AvgPool2d(4)  # 平均化
         self.avg = nn.AdaptiveAvgPool2d(output_size=(1, 1))
         self.classifier = nn.Linear(512, num_classes)  # 全连接

@@ -1,4 +1,5 @@
 from pydoc import describe
+from sys import path_hooks
 from cipher import aes
 from cipher import des
 import torch
@@ -12,6 +13,9 @@ from functools import partial
 import numpy as np
 import torch.utils.data as data
 import ray
+from joblib import Parallel, delayed
+import pandas as pd
+import math
 
 
 def file2cipher(file_dir, targetDir, encrypt, label, file_percent=1):
@@ -124,6 +128,34 @@ def getFeature(file_dir, function, inputSize):
     return np.concatenate(feature_nparr, axis=0)
 
 
+def getFeature_joblib(file_dir, function, inputSize, feature_dir=None, pieces=16):
+    """
+    shape : (num * inputSize * inputSize)
+    function : bitcount etc.
+    if you cut feature into pieces ,please make sure they are the same size between calogories
+    """
+    def process(file):
+        # apply the function
+        feature = function(file)
+        inputSize_2 = inputSize ** 2
+        feature = feature[0:(len(feature) // inputSize_2) * inputSize_2]
+        feature_df = pd.DataFrame(np.array(feature, dtype=np.float32).reshape(-1, inputSize_2))
+            
+        return feature_df
+    
+    def pd2csv(index):
+        feature.iloc[index * every_epoch_num:(index + 1) * every_epoch_num].to_csv(feature_dir + "/" + "feature_slice_" + str(index) + ".csv", index=False)
+
+    args = [file_dir + "/" + file for file in os.listdir(file_dir)]
+    
+    feature_pdarr = Parallel(n_jobs=12)(delayed(process)(file) for file in args)
+    if feature_dir is None:
+        return pd.concat(feature_pdarr, axis=0)
+    else:
+        feature = pd.concat(feature_pdarr, axis=0)
+        every_epoch_num = math.floor(len(feature) / pieces)
+        Parallel(n_jobs=12)(delayed(pd2csv)(index) for index in range(pieces))
+
 class DataSet(data.Dataset):
     """
     shape: (num * 1 * inputSize * inputSize)
@@ -155,8 +187,8 @@ if __name__ == '__main__':
     cipherDir_aes = "/Users/daisy/Downloads/cipher_aes"
     cipherDir_des = "/Users/daisy/Downloads/cipher_des"
 
-    aes_ecb = aes.AES_ECB()
-    des3_ecb = des.TDES_ECB()
+    # aes_ecb = aes.AES_ECB()
+    # des3_ecb = des.TDES_ECB()
 
     # count = 0
     # for dir in os.listdir(wiki_zh):
@@ -165,7 +197,7 @@ if __name__ == '__main__':
     # for dir in os.listdir(imagenet):
     #     count = file2cipher(imagenet + "/" + dir, cipherDir_des,
     #                         des3_ecb.encrypt, "imagenet_DES3_ECB", count)
-    file2cipher(voice, cipherDir_des, des3_ecb.encrypt, "voice_DES3_ECB", 0.1)
+    # file2cipher(voice, cipherDir_des, des3_ecb.encrypt, "voice_DES3_ECB", 0.1)
 
     # count = 0
     # for dir in os.listdir(wiki_zh):
@@ -174,10 +206,13 @@ if __name__ == '__main__':
     # for dir in os.listdir(imagenet):
     #     count = file2cipher(imagenet + "/" + dir, cipherDir_aes,
     #                         aes_ecb.encrypt, "imagenet_AES_ECB", count)
-    file2cipher(voice, cipherDir_aes, aes_ecb.encrypt, "voice_AES_ECB", 0.1)
+    # file2cipher(voice, cipherDir_aes, aes_ecb.encrypt, "voice_AES_ECB", 0.1)
 
     # np_file = "/root/auto-tmp/feature"
     # t1 = time.time()
     # getFeature(cipherDir, bitcount, 224)
     # print(time.time() - t1)
     # data = DataSet(0, np_file)
+
+    feature_dir = "/Users/daisy/Downloads/feature"
+    getFeature_joblib(cipherDir_aes, bitcount, 224, feature_dir)

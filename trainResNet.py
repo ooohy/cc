@@ -42,7 +42,7 @@ if __name__ == "__main__":
     feature_dir_dict[1] = feature_dir_des3
 
 
-    lazyLoadAndTrain(resnet, train_partial, 4, 4, feature_dir_dict)
+    lazyLoadAndTrain(resnet, train_partial, 4, feature_dir_dict, 8, 12, 24, 2)
     # des3_data = preprocess.DataSet(1, preprocess.getFeature_ray(cipherDir_des, preprocess.bitcount, 224))
     # aes_data = preprocess.DataSet(0, preprocess.getFeature_ray(cipherDir_aes, preprocess.bitcount, 224))
     # aes_data = preprocess.DataSet(0, preprocess.getFeature_joblib(cipherDir_aes, preprocess.bitcount, 224))    

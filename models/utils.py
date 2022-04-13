@@ -1,3 +1,4 @@
+from asyncore import ExitNow
 import torch
 import torch.nn as nn
 import os
@@ -8,6 +9,8 @@ from torch.utils.data import Dataset, DataLoader
 import torch.utils.data.dataset as dataset
 import gc
 import time
+from joblib import Parallel, delayed
+import math
 
 
 def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimizer_name="SGD", lr=0.05, momentum=0.8, modelPath=None, lazyloading=False):
@@ -52,26 +55,36 @@ def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimi
         return last_loss
 
 
-def lazyLoadAndTrain(model, train_partial, batchsize, num_workers ,feature_dir_dict, piece_num=3,epoch=10, modelPath=None):
+def lazyLoadAndTrain(model, train_partial, batchsize, feature_dir_dict, step=8, num_workers=24, pieces_num=24, epoch=10, modelPath=None):
     """
     dataloader_partial : shuffle has been fixed
     """
-    feature_iter_dict = dict()
+    feature_pieces_dict = dict()
     for key, value in feature_dir_dict.items():
-        feature_iter_dict[key] = iter(
-            [value + "/" + file for file in os.listdir(feature_dir_dict[key])])
+        feature_pieces_dict[key] = [value + "/" + file for file in os.listdir(feature_dir_dict[key])]
+        
 
     for round in range(epoch):
-        for piece in range(piece_num):
+        for p in range(0, pieces_num, step):
             dataset_array = []
-            for key, value in feature_iter_dict.items():
-                dataset_array.append(DataSet_lazyloading(int(key), next(value)))
-                dataset_piece = dataset.ConcatDataset(dataset_array)
-            dataloader = DataLoader(dataset_piece, shuffle=True, batch_size=batchsize, num_workers=num_workers)
+            # for key, value in feature_pieces_dict.items():
+            #     dataset_array.append(DataSet_lazyloading(int(key), next(value)))
+            #     dataset_piece = dataset.ConcatDataset(dataset_array)
+            label_arr = []
+            dir_arr = []
+            for key, value in feature_pieces_dict.items():
+                label_arr.extend([key]*step)
+                dir_arr.extend(value[p:p+step])
+            dataset_array = Parallel(num_workers)(delayed(DataSet_lazyloading)(label, dir) for label, dir in zip(label_arr, dir_arr))
+            dataset_pieces = dataset.ConcatDataset(dataset_array)
+            dataloader = DataLoader(dataset_pieces, shuffle=True, batch_size=batchsize, num_workers=num_workers)
             loss = train_partial(model, dataloader, epoch=1, modelPath=None, lazyloading=True)
 
             # print Loss
-            print('[%d, %2d] loss: %.3f' %(round, piece, loss/ 2000))
+            try: 
+                print('[%d, %2d] loss: %.3f' %(round, math.ceil(p/step), loss/ 2000))
+            except:
+                pass
             # print time
             print("  >>  ", time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
             # clear memory

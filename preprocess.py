@@ -59,7 +59,6 @@ def bitcount(file_path, bitCountWise=8):
             p += bitCountWise
     return count_arr
 
-
 def getFeature_mp(file_dir, function, inputSize):
     """
     shape : (num * inputSize * inputSize)
@@ -83,7 +82,6 @@ def getFeature_mp(file_dir, function, inputSize):
     pool.join()
     return np.concatenate(feature_nparr, axis=0)
 
-
 def getFeature_ray(file_dir, function, inputSize):
     """
     shape : (num * inputSize * inputSize)
@@ -102,7 +100,6 @@ def getFeature_ray(file_dir, function, inputSize):
 
     feature = [process.remote(file) for file in file_array]
     return np.concatenate(ray.get(feature), axis=0)
-
 
 def getFeature(file_dir, function, inputSize):
     """
@@ -125,7 +122,7 @@ def getFeature(file_dir, function, inputSize):
         process(f)
     return np.concatenate(feature_nparr, axis=0)
 
-def getFeature_joblib(file_dir, function, inputSize, feature_dir, pieces=16):
+def getFeature_joblib(file_dir, function, inputSize, feature_dir, pieces=16, num_workers=24):
     """
     shape : (num * inputSize * inputSize)
     function : bitcount etc.
@@ -164,7 +161,7 @@ class DataSet(data.Dataset):
 
     def __getitem__(self, index):
         if torch.cuda.is_available():
-            return torch.from_numpy(self.feature_np[index]).unsqueeze(0).cuda(), torch.tensor(self.label, dtype=torch.long).cuda()
+            return torch.rom_numpy(self.feature_np[index]).unsqueeze(0).cuda(), torch.tensor(self.label, dtype=torch.long).cuda()
         else:
             return torch.from_numpy(self.feature_np[index]).unsqueeze(0), torch.tensor(self.label, dtype=torch.long)
 
@@ -232,5 +229,5 @@ if __name__ == '__main__':
 
     feature_dir_aes = "/Users/daisy/Downloads/feature/aes_feature"
     feature_dir_des3 = "/Users/daisy/Downloads/feature/des3_feature"
-    getFeature_joblib(cipherDir_aes, bitcount, 224, feature_dir_aes, pieces=3)
-    getFeature_joblib(cipherDir_des, bitcount, 224, feature_dir_des3, pieces=3)
+    getFeature_joblib(cipherDir_aes, bitcount, 224, feature_dir_aes, pieces=24, num_workers=12)
+    getFeature_joblib(cipherDir_des, bitcount, 224, feature_dir_des3, pieces=24, num_workers=12)

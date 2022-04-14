@@ -88,8 +88,8 @@ def lazyLoadAndTrain(model, train_partial, batchsize, feature_dir_dict, step=8, 
             # print time
             print("  >>  ", time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
             # clear memory
-            del dataset_array, dataset_piece, dataloader
-            gc.collect()
+            # del dataset_array, dataset_piece, dataloader
+            # gc.collect()
 
     torch.save(model, modelPath)
 

@@ -1,6 +1,10 @@
 from models.ResNet import ResNet18
 from models.utils import train
+<<<<<<< HEAD
 # from models.utils import lazyLoadAndTrain
+=======
+from models.utils import lazyLoadAndTrain
+>>>>>>> master
 import preprocess
 import torch
 from preprocess import DataSet, DataSet_joblib
@@ -34,7 +38,11 @@ if __name__ == "__main__":
     # cipherDir_des = "/root/testdata/des"
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+<<<<<<< HEAD
     train_partial = partial(train, epoch=2)
+=======
+    train_partial = partial(train, epoch=10)
+>>>>>>> master
     resnet = ResNet18().to(device)
 
     # feature_dir_dict = dict()
@@ -49,11 +57,25 @@ if __name__ == "__main__":
     # train(resnet, dataloader, 10, "/root/trainedmodel/resnet18.model")
     feature_dir_aes = "/root/autodl-tmp/feature/feature_pieces/aes_full"
     feature_dir_des3 = "/root/autodl-tmp/feature/feature_pieces/des_full"
+<<<<<<< HEAD
     dataset_aes = DataSet_joblib(0, feature_dir_aes)
     dataset_des3 = DataSet_joblib(1, feature_dir_des3)
     dataset = data.ConcatDataset([dataset_aes, dataset_des3])
     dataloader = DataLoader(dataset, 128, True)
     train(resnet, dataloader, 8, modelPath="/root/trainedmodel/resnet18_AESTDES_ECB.py")
+=======
+    # dataset_aes = DataSet_joblib(0, feature_dir_aes)
+    # dataset_des3 = DataSet_joblib(1, feature_dir_des3)
+    # dataset = data.ConcatDataset([dataset_aes, dataset_des3])
+    feature_dir_dict = {}
+    feature_dir_dict[0] = feature_dir_aes
+    feature_dir_dict[1] = feature_dir_des3
+    lazyLoadAndTrain(resnet, train_partial, 128, feature_dir_dict, 8, modelPath="/root/trainedmodel/resnet18.model")
+
+
+    # dataloader = DataLoader(dataset, 128, True)
+    # train(resnet, dataloader, 8, modelPath="/root/trainedmodel/resnet18_AESTDES_ECB.py")
+>>>>>>> master
 
 
 

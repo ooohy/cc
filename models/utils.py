@@ -1,5 +1,8 @@
 from asyncore import ExitNow
+<<<<<<< HEAD
 from lzma import MODE_NORMAL
+=======
+>>>>>>> master
 import torch
 import torch.nn as nn
 import os
@@ -14,7 +17,11 @@ from joblib import Parallel, delayed
 import math
 
 
+<<<<<<< HEAD
 def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimizer_name="SGD", lr=0.05, momentum=0.8, modelPath=None, lazyloadring=False):
+=======
+def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimizer_name="SGD", lr=0.05, momentum=0.8, modelPath=None, lazyloading=False):
+>>>>>>> master
     if criterion_name == "CrossEntropyLoss":
         criterion = nn.CrossEntropyLoss()
     elif criterion_name == "L1Loss":
@@ -26,6 +33,7 @@ def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimi
     elif optimizer_name == "Adam":
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
+    last_loss = 0
     for round in range(epoch):  # loop over the dataset multiple times
         running_loss = 0.0
         for i, data in enumerate(dataloader, 0):
@@ -43,6 +51,7 @@ def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimi
             optimizer.step()
 
            # print statistics
+<<<<<<< HEAD
             last_loss = 0
             if lazyloadring is False:
                 running_loss += loss.item()
@@ -56,6 +65,17 @@ def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimi
     if modelPath is not None:
         torch.save(model, modelPath)
     if lazyloadring is True:
+=======
+            running_loss += loss.item()
+            if i % 2000 == 1999:    # print every 2000 mini-batches
+                print('[%d, %5d] loss: %.3f' %
+                      (round, i + 1, running_loss / 2000))
+                last_loss = running_loss
+                running_loss = 0.0
+    if modelPath:
+        torch.save(model, modelPath)
+    if lazyloading == True:
+>>>>>>> master
         return last_loss
 
 

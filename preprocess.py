@@ -122,7 +122,7 @@ def getFeature(file_dir, function, inputSize):
         process(f)
     return np.concatenate(feature_nparr, axis=0)
 
-def getFeature_joblib(file_dir, function, inputSize, feature_dir, num_workers=24):
+def getFeature_joblib(file_dir, function, inputSize, feature_dir, pieces=16, num_workers=24):
     """
     shape : (num * inputSize * inputSize)
     function : bitcount etc.
@@ -162,7 +162,7 @@ class DataSet(data.Dataset):
 
     def __getitem__(self, index):
         if torch.cuda.is_available():
-            return torch.from_numpy(self.feature_np[index]).unsqueeze(0).cuda(), torch.tensor(self.label, dtype=torch.long).cuda()
+            return torch.rom_numpy(self.feature_np[index]).unsqueeze(0).cuda(), torch.tensor(self.label, dtype=torch.long).cuda()
         else:
             return torch.from_numpy(self.feature_np[index]).unsqueeze(0), torch.tensor(self.label, dtype=torch.long)
 
@@ -254,3 +254,8 @@ if __name__ == '__main__':
     feature_dir_des3 = "/root/autodl-tmp/feature/feature_pieces/des_full"
     getFeature_joblib(cipherDir_aes, bitcount, 224, feature_dir_aes, num_workers=24)
     getFeature_joblib(cipherDir_des, bitcount, 224, feature_dir_des3, num_workers=24)
+
+    feature_dir_aes = "/Users/daisy/Downloads/feature/aes_feature"
+    feature_dir_des3 = "/Users/daisy/Downloads/feature/des3_feature"
+    getFeature_joblib(cipherDir_aes, bitcount, 224, feature_dir_aes, pieces=24, num_workers=12)
+    getFeature_joblib(cipherDir_des, bitcount, 224, feature_dir_des3, pieces=24, num_workers=12)

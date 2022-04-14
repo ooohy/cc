@@ -52,10 +52,14 @@ if __name__ == "__main__":
     # dataset_aes = DataSet_joblib(0, feature_dir_aes)
     # dataset_des3 = DataSet_joblib(1, feature_dir_des3)
     # dataset = data.ConcatDataset([dataset_aes, dataset_des3])
-    lazyLoadAndTrain(resnet, train_partial)
+    feature_dir_dict = {}
+    feature_dir_dict[0] = feature_dir_aes
+    feature_dir_dict[1] = feature_dir_des3
+    lazyLoadAndTrain(resnet, train_partial, 128, feature_dir_dict, 8, modelPath="/root/trainedmodel/resnet18.model")
 
-    dataloader = DataLoader(dataset, 128, True)
-    train(resnet, dataloader, 8, modelPath="/root/trainedmodel/resnet18_AESTDES_ECB.py")
+
+    # dataloader = DataLoader(dataset, 128, True)
+    # train(resnet, dataloader, 8, modelPath="/root/trainedmodel/resnet18_AESTDES_ECB.py")
 
 
 

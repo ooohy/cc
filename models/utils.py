@@ -77,7 +77,7 @@ def lazyLoadAndTrain(model, train_partial, batchsize, feature_dir_dict, step=8, 
                 dir_arr.extend(value[p:p+step])
             dataset_array = Parallel(num_workers)(delayed(DataSet_lazyloading)(label, dir) for label, dir in zip(label_arr, dir_arr))
             dataset_pieces = dataset.ConcatDataset(dataset_array)
-            dataloader = DataLoader(dataset_pieces, shuffle=True, batch_size=batchsize, num_workers=num_workers)
+            dataloader = DataLoader(dataset_pieces, shuffle=True, batch_size=batchsize)
             loss = train_partial(model, dataloader, epoch=1, modelPath=None, lazyloading=True)
 
             # print Loss

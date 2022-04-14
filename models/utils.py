@@ -1,12 +1,7 @@
 from asyncore import ExitNow
-<<<<<<< HEAD
-from lzma import MODE_NORMAL
-=======
->>>>>>> master
 import torch
 import torch.nn as nn
 import os
-from preprocess import DataSet
 from preprocess import DataSet_lazyloading
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset, DataLoader
@@ -17,11 +12,7 @@ from joblib import Parallel, delayed
 import math
 
 
-<<<<<<< HEAD
-def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimizer_name="SGD", lr=0.05, momentum=0.8, modelPath=None, lazyloadring=False):
-=======
 def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimizer_name="SGD", lr=0.05, momentum=0.8, modelPath=None, lazyloading=False):
->>>>>>> master
     if criterion_name == "CrossEntropyLoss":
         criterion = nn.CrossEntropyLoss()
     elif criterion_name == "L1Loss":
@@ -40,6 +31,7 @@ def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimi
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
             inputs = inputs.float()
+            labels = labels.long()
 
             # zero the parameter gradients
             optimizer.zero_grad()
@@ -51,9 +43,8 @@ def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimi
             optimizer.step()
 
            # print statistics
-<<<<<<< HEAD
             last_loss = 0
-            if lazyloadring is False:
+            if lazyloading is False:
                 running_loss += loss.item()
                 if i % 2000 == 1999:    # print every 2000 mini-batches
                     print('[%d, %5d] loss: %.3f' %
@@ -64,18 +55,7 @@ def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimi
                     running_loss = 0.0
     if modelPath is not None:
         torch.save(model, modelPath)
-    if lazyloadring is True:
-=======
-            running_loss += loss.item()
-            if i % 2000 == 1999:    # print every 2000 mini-batches
-                print('[%d, %5d] loss: %.3f' %
-                      (round, i + 1, running_loss / 2000))
-                last_loss = running_loss
-                running_loss = 0.0
-    if modelPath:
-        torch.save(model, modelPath)
-    if lazyloading == True:
->>>>>>> master
+    if lazyloading is True:
         return last_loss
 
 

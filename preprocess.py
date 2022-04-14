@@ -122,11 +122,11 @@ def getFeature(file_dir, function, inputSize):
         process(f)
     return np.concatenate(feature_nparr, axis=0)
 
-def getFeature_joblib(file_dir, function, inputSize, feature_dir, pieces=16, num_workers=24):
+def getFeature_joblib(file_dir, function, inputSize, feature_dir, num_workers=24):
     """
     shape : (num * inputSize * inputSize)
     function : bitcount etc.
-    if you cut feature into pieces ,please make sure they are the same size between calogories
+    get feature in csv
     """
     def process(file):
         # apply the function
@@ -135,25 +135,24 @@ def getFeature_joblib(file_dir, function, inputSize, feature_dir, pieces=16, num
         feature_df = pd.DataFrame(np.array(feature, dtype=np.int8).reshape(-1, inputSize_2))
         return feature_df
     
-    def pd2csv(index):
-        feature.iloc[index * each_pieces_len:(index + 1) * each_pieces_len].to_csv(feature_dir + "/" + "feature_slice_" + str(index) + ".csv", index=False)
+    # def pd2csv(index):
+    #     feature.iloc[index * each_pieces_len:(index + 1) * each_pieces_len].to_csv(feature_dir + "/" + "feature_slice_" + str(index) + ".csv", index=False)
 
     inputSize_2 = inputSize ** 2
     args = [file_dir + "/" + file for file in os.listdir(file_dir)]
     feature_pdarr = Parallel(n_jobs=num_workers)(delayed(process)(file) for file in args)
 
     feature = pd.concat(feature_pdarr, axis=0)
-    each_pieces_len = (len(feature) // num_workers)
-    Parallel(n_jobs=num_workers)(delayed(pd2csv)(index) for index in range(num_workers))
+    feature.to_csv(feature_dir, index=False)
 
 
-class DataSet(data.Dataset):
+class DataSet_np(data.Dataset):
     """
     shape: (num * 1 * inputSize * inputSize)
     """
 
     def __init__(self, label, feature_np):
-        super(DataSet, self).__init__()
+        super(DataSet_np, self).__init__()
         self.feature_np = feature_np
         self.label = label
 
@@ -162,9 +161,28 @@ class DataSet(data.Dataset):
 
     def __getitem__(self, index):
         if torch.cuda.is_available():
-            return torch.rom_numpy(self.feature_np[index]).unsqueeze(0).cuda(), torch.tensor(self.label, dtype=torch.long).cuda()
+            return torch.from_numpy(self.feature_np[index]).unsqueeze(0).cuda(), torch.tensor(self.label, dtype=torch.int8).cuda()
         else:
-            return torch.from_numpy(self.feature_np[index]).unsqueeze(0), torch.tensor(self.label, dtype=torch.long)
+            return torch.from_numpy(self.feature_np[index]).unsqueeze(0), torch.tensor(self.label, dtype=torch.int8)
+
+class DataSet_csv(data.Dataset):
+    def __init__(self, label,feature_dir, size=None):
+        super(DataSet_csv, self).__init__()
+        self.feature_dir = feature_dir
+        self.label = label
+        feature_df = pd.read_csv(feature_dir, nrows=size)
+        feature_np = feature_df.to_numpy()
+        inputSize = int(feature_np.shape[1] ** 0.5)
+        self.feature_np = feature_np.reshape(-1, 1, inputSize, inputSize)
+
+    def __getitem__(self, index):
+        if torch.cuda.is_available():
+            return torch.from_numpy(self.feature_np[index]).cuda(), torch.tensor(self.label, dtype=torch.long).cuda()
+        else:
+            return torch.from_numpy(self.feature_np[index]), torch.tensor(self.label, dtype=torch.long)
+
+    def __len__(self):
+        return self.feature_np.shape[0]
 
 class DataSet_lazyloading(data.Dataset):
     def __init__(self, label, feature_piece_dir):

@@ -1,8 +1,4 @@
-from pydoc import describe
-from cipher import aes
-from cipher import des
 import torch
-import time
 import os
 from bitarray import bitarray
 # from multiprocessing.pool import ThreadPool as Pool
@@ -13,11 +9,12 @@ import numpy as np
 import torch.utils.data as data
 import ray
 from joblib import Parallel, delayed
-import pandas as pd
+# import pandas as pd
 import math
 import random
 import string
 from torch.utils.data import Dataset
+import modin.pandas as pd
 
 
 
@@ -146,13 +143,13 @@ def getFeature_joblib(file_dir, function, inputSize, feature_dir, num_workers=24
     feature.to_csv(feature_dir, index=False)
 
 
-class DataSet_np(data.Dataset):
+class DataSet(data.Dataset):
     """
     shape: (num * 1 * inputSize * inputSize)
     """
 
     def __init__(self, label, feature_np):
-        super(DataSet_np, self).__init__()
+        super(DataSet, self).__init__()
         self.feature_np = feature_np
         self.label = label
 
@@ -161,28 +158,27 @@ class DataSet_np(data.Dataset):
 
     def __getitem__(self, index):
         if torch.cuda.is_available():
-            return torch.from_numpy(self.feature_np[index]).unsqueeze(0).cuda(), torch.tensor(self.label, dtype=torch.int8).cuda()
+            return torch.from_numpy(self.feature_np[index]).unsqueeze(0).cuda(), torch.tensor(self.label, dtype=torch.long).cuda()
         else:
-            return torch.from_numpy(self.feature_np[index]).unsqueeze(0), torch.tensor(self.label, dtype=torch.int8)
+            return torch.from_numpy(self.feature_np[index]).unsqueeze(0), torch.tensor(self.label, dtype=torch.long)
 
 class DataSet_csv(data.Dataset):
-    def __init__(self, label,feature_dir, size=None):
+    def __init__(self, label,feature_dir):
         super(DataSet_csv, self).__init__()
-        self.feature_dir = feature_dir
-        self.label = label
-        feature_df = pd.read_csv(feature_dir, nrows=size)
-        feature_np = feature_df.to_numpy()
-        inputSize = int(feature_np.shape[1] ** 0.5)
-        self.feature_np = feature_np.reshape(-1, 1, inputSize, inputSize)
+        self.label = torch.tensor(label, dtype=torch.long)
+        feature_df = pd.read_csv(feature_dir)
+        feature_pt = torch.tensor(feature_df.values, dtype=torch.float32)
+        inputSize = int(feature_pt.shape[1] ** 0.5)
+        self.feature_pt = feature_pt.reshape(-1, 1, inputSize, inputSize)
 
     def __getitem__(self, index):
         if torch.cuda.is_available():
-            return torch.from_numpy(self.feature_np[index]).cuda(), torch.tensor(self.label, dtype=torch.long).cuda()
+            return self.feature_pt[index].cuda(), self.label.cuda()
         else:
-            return torch.from_numpy(self.feature_np[index]), torch.tensor(self.label, dtype=torch.long)
+            return self.feature_pt[index], self.label
 
     def __len__(self):
-        return self.feature_np.shape[0]
+        return self.feature_pt.shape[0]
 
 class DataSet_lazyloading(data.Dataset):
     def __init__(self, label, feature_piece_dir):
@@ -268,12 +264,37 @@ if __name__ == '__main__':
 
     # feature_dir_aes = "/Users/daisy/Downloads/feature/aes_feature"
     # feature_dir_des3 = "/Users/daisy/Downloads/feature/des3_feature"
-    feature_dir_aes = "/root/autodl-tmp/feature/feature_pieces/aes_full"
-    feature_dir_des3 = "/root/autodl-tmp/feature/feature_pieces/des_full"
-    getFeature_joblib(cipherDir_aes, bitcount, 224, feature_dir_aes, num_workers=24)
-    getFeature_joblib(cipherDir_des, bitcount, 224, feature_dir_des3, num_workers=24)
+    # feature_dir_aes = "/root/autodl-tmp/feature/feature_pieces/aes_full"
+    # feature_dir_des3 = "/root/autodl-tmp/feature/feature_pieces/des_full"
+    feature_dir_aes = "/root/autodl-tmp/feature/aes_fixposi"
+    feature_dir_des3 = "/root/autodl-tmp/feature/des_fixposi"
+    # getFeature_joblib(cipherDir_aes, bitcount, 224, feature_dir_aes, num_workers=24)
+    # getFeature_joblib(cipherDir_des, bitcount, 224, feature_dir_des3, num_workers=24)
 
-    feature_dir_aes = "/Users/daisy/Downloads/feature/aes_feature"
-    feature_dir_des3 = "/Users/daisy/Downloads/feature/des3_feature"
-    getFeature_joblib(cipherDir_aes, bitcount, 224, feature_dir_aes, pieces=24, num_workers=12)
-    getFeature_joblib(cipherDir_des, bitcount, 224, feature_dir_des3, pieces=24, num_workers=12)
+    # feature_dir_aes = "/Users/daisy/Downloads/feature/aes_feature"
+    # feature_dir_des3 = "/Users/daisy/Downloads/feature/des3_feature"
+    # getFeature_joblib(cipherDir_aes, bitcount, 224, feature_dir_aes, pieces=24, num_workers=12)
+    # getFeature_joblib(cipherDir_des, bitcount, 224, feature_dir_des3, pieces=24, num_workers=12)
+    aes_feature = "/root/autodl-tmp/feature/AES_ECB_feature.csv"
+
+    des_feature = "/root/autodl-tmp/feature/TDES_ECB_feature.csv"
+
+    aes_full_dir = "/root/autodl-tmp/feature/feature_pieces/aes_full"
+
+    des_full_dir = "/root/autodl-tmp/feature/feature_pieces/des_full"
+
+    aes_arr = [aes_full_dir + '/' + path for path in os.listdir(aes_full_dir)]
+    des_arr = [des_full_dir + '/' + path for path in os.listdir(des_full_dir)]
+
+    aes_df_arr = []
+    des_df_arr = []
+
+    for file in aes_arr:
+        aes_df_arr.append(pd.read_csv(aes_arr))
+    aes_df = pd.concat(aes_df_arr)
+    aes_df.to_csv(aes_feature)
+
+    for file in des_arr:
+        des_df_arr.append(pd.read_csv(aes_arr))
+    des_df = pd.concat(des_df_arr)
+    des_df.to_csv(des_feature)

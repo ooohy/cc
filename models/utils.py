@@ -1,4 +1,5 @@
 from asyncore import ExitNow
+import tensorboard
 import torch
 import torch.nn as nn
 import os
@@ -10,9 +11,12 @@ import gc
 import time
 from joblib import Parallel, delayed
 import math
+from torch.utils.tensorboard import SummaryWriter
 
 
-def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimizer_name="SGD", lr=0.05, momentum=0.8, modelPath=None, lazyloading=False):
+
+def train(model, dataloader, epoch=1, criterion_name="CrossEntropyLoss", optimizer_name="SGD", lr=0.05, momentum=0.8, modelPath=None, lazyloading=False, tensorboard=False):
+    writer = SummaryWriter()
     if criterion_name == "CrossEntropyLoss":
         criterion = nn.CrossEntropyLoss()
     elif criterion_name == "L1Loss":
@@ -25,13 +29,14 @@ def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimi
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     last_loss = 0
+    counter = 0
     for round in range(epoch):  # loop over the dataset multiple times
         running_loss = 0.0
         for i, data in enumerate(dataloader, 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
-            inputs = inputs.float()
-            labels = labels.long()
+            # inputs = inputs.float()
+            # labels = labels.long()
 
             # zero the parameter gradients
             optimizer.zero_grad()
@@ -46,17 +51,19 @@ def train(model, dataloader, epoch=10, criterion_name="CrossEntropyLoss", optimi
             last_loss = 0
             if lazyloading is False:
                 running_loss += loss.item()
-                if i % 2000 == 1999:    # print every 2000 mini-batches
+                if i % 50 == 49:    # print every 2000 mini-batches
                     print('[%d, %5d] loss: %.3f' %
-                        (round, i + 1, running_loss / 2000))
+                        (round, i + 1, running_loss / 50))
                     print("  >>  ", time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
                     # last_loss = running_loss
-                    last_loss = running_loss / 2000
+                    last_loss = running_loss / 50 
+                    counter += 1
+                    if tensorboard:
+                        writer.add_scalar('Loss/train', running_loss/50, counter)
                     running_loss = 0.0
     if modelPath is not None:
         torch.save(model, modelPath)
-    if lazyloading is True:
-        return last_loss
+    return last_loss
 
 
 def lazyLoadAndTrain(model, train_partial, batchsize, feature_dir_dict, step=8, num_workers=24, pieces_num=24, epoch=10, modelPath=None):
@@ -111,18 +118,20 @@ def val(model, dataloader):
     return correct / total
 
 
-def batchVal(model, dataloader):
+def batchVal(model, batch):
+    """
+    correct.dtype = torch.bool
+    """
     correct = 0
-    total = dataloader.__len__()
-    pre = torch.empty()
     with torch.no_grad():
-        for data in dataloader:
-            matrix, labels = data
-            outputs = model(matrix)
-            _, predict_tensor = torch.max(outputs.data, 1)
-            _, predict = torch.mode(predict_tensor)
-            correct += (predict == labels)
-
+        matrix, labels = batch
+        outputs = model(matrix)
+        _, predict_tensor = torch.max(outputs.data, 1)
+        predict, _ = torch.mode(predict_tensor)
+        correct = (predict == labels[0])
+        # move corrct to cpu and transform it to int
+        correct = int(correct)
+    return correct
 
 def classifier(model, dataloader):
     pre = torch.empty()

@@ -103,6 +103,40 @@ class ResNet18(nn.Module):
         x = x.view(x.size(0), -1)
         out = self.classifier(x)
         return out
+class ResNet18(nn.Module):
+    """
+    implement of ResNet thanks to https://www.ji
+    anshu.com/p/972e2c5e6871  \n
+    https://zhuanlan.zhihu.com/p/42706477
+    """
+
+    def __init__(self, num_classes=2):
+        super(ResNet18, self).__init__()
+        self.pre = nn.Sequential(  # 第一层
+            nn.Conv2d(1, 64, kernel_size=7, stride=1, padding=3, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(True),
+            # nn.MaxPool2d(3, 2, 1)
+            nn.MaxPool2d(kernel_size=2)
+        )
+        self.layer1 = make_layer18(64, 64, 2, 2)  # 7*7
+        self.layer2 = make_layer18(64, 128, 2, 2)  #
+        self.layer3 = make_layer18(128, 256, 2, 2)  # stride = 2
+        self.layer4 = make_layer18(256, 512, 2)  # stride = 2
+        # self.avg = nn.AvgPool2d(4)  # 平均化
+        self.avg = nn.AdaptiveAvgPool2d(output_size=(1, 1))
+        self.classifier = nn.Linear(512, num_classes)  # 全连接
+
+    def forward(self, x):
+        x = self.pre(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.avg(x)
+        x = x.view(x.size(0), -1)
+        out = self.classifier(x)
+        return out
 
 class ResNet50(nn.Module):
     def __init__(self, num_classes=2, input_channels=1):

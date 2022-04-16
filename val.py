@@ -1,7 +1,7 @@
 from numpy import concatenate
 import models.ResNet
 import torch
-from preprocess import DataSet_csv
+from preprocess import DataSet_np
 import os 
 from torch.utils.data import DataLoader
 from torch.utils.data import ConcatDataset
@@ -11,16 +11,20 @@ from models.utils import batchVal
 
 # torch.multiprocessing.set_start_method('spawn')
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-resnet = torch.load('/root/trainedmodel/resnet18_AES_DES3_ECB_full_32.model').to(device)
-feature_dir_aes = "/root/autodl-tmp/feature/feature_pieces/aes_full"
-feature_dir_des3 = "/root/autodl-tmp/feature/feature_pieces/des_full"
-feature_dir_aes_arr = [feature_dir_aes + '/' + path for path in os.listdir(feature_dir_aes)]
-feature_dir_des3_arr = [feature_dir_des3 + '/' + path for path in os.listdir(feature_dir_des3)]
+resnet = torch.load('/root/trainedmodel/resnet18_AES_DES3_ECB_mini_256_in8.model').to(device)
+# feature_dir_aes = "/root/autodl-tmp/feature/feature_pieces/aes_full"
+# feature_dir_des3 = "/root/autodl-tmp/feature/feature_pieces/des_full"
+# feature_dir_aes = "/root/autodl-tmp/feature/aes_rand_256_in8"
+# feature_dir_des3 = "/root/autodl-tmp/feature/des3_rand_256_in8"
+feature_dir_aes = "/root/autodl-tmp/feature/aes_rand_256_in8"
+feature_dir_des3 = "/root/autodl-tmp/feature/des3_rand_256_in8"
+feature_dir_aes_arr = [feature_dir_aes + '/' + path for path in os.listdir(feature_dir_aes)][0:10000]
+feature_dir_des3_arr = [feature_dir_des3 + '/' + path for path in os.listdir(feature_dir_des3)][0:10000]
 
-dataset_aes = DataSet_csv(0, feature_dir_aes_arr[23])
-dataset_des = DataSet_csv(1, feature_dir_des3_arr[23])
-iterDataloader_aes = iter(DataLoader(dataset_aes, 32, False))
-iterDataloader_des = iter(DataLoader(dataset_des, 32, False))
+dataset_aes = DataSet_np(0, feature_dir_aes_arr, in_channel=8)
+dataset_des = DataSet_np(1, feature_dir_des3_arr, in_channel=8)
+iterDataloader_aes = iter(DataLoader(dataset_aes, 128, False))
+iterDataloader_des = iter(DataLoader(dataset_des, 128, False))
 
 sum = 0
 corrcet_sum = 0

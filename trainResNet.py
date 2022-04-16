@@ -1,22 +1,13 @@
 from models.ResNet import ResNet18
 from models.utils import train
 from models.utils import lazyLoadAndTrain
-from preprocess import bitcount
-import preprocess
-from preprocess import getFeature_joblib
 import torch
-from preprocess import DataSet_joblib
 from torch.utils.data import DataLoader
 import torch.utils.data as data
-import time
-import ray
-import json
-from functools import partial
 import os
 # import pandas as pd
 import modin.pandas as pd
-from preprocess import DataSet_csv
-from preprocess import DataSet
+from preprocess import DataSet_np
 from torch.utils.tensorboard import SummaryWriter
 
 # ray.init(
@@ -42,7 +33,7 @@ if __name__ == "__main__":
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # train_partial = partial(train, epoch=10)
-    resnet = ResNet18().to(device)
+    resnet = ResNet18(in_channel=8).to(device)
     # feature_dir_dict = dict()
     # feature_dir_aes = "/Users/daisy/Downloads/feature/aes_feature.csv"
     # feature_dir_des3 = "/Users/daisy/Downloads/feature/des3_feature"
@@ -53,8 +44,8 @@ if __name__ == "__main__":
     # dataset = torch.load("/root/autodl-tmp/feature/feature_dataset_mini")
     # dataloader = DataLoader(dataset, 128, True)
     # train(resnet, dataloader, 10, "/root/trainedmodel/resnet18.model")
-    feature_dir_aes = "/root/autodl-tmp/feature/feature_pieces/aes_full"
-    feature_dir_des3 = "/root/autodl-tmp/feature/feature_pieces/des_full"
+    feature_dir_aes = "/root/autodl-tmp/feature/aes_rand_256_in8"
+    feature_dir_des3 = "/root/autodl-tmp/feature/des3_rand_256_in8"
     # dataset_aes = DataSet_joblib(0, feature_dir_aes)
     # dataset_des3 = DataSet_joblib(1, feature_dir_des3)
     # dataset = data.ConcatDataset([dataset_aes, dataset_des3
@@ -90,23 +81,36 @@ if __name__ == "__main__":
     # dataset = data.ConcatDataset(dataset_arr)
     # torch.save(dataset, "AES")
 
-    
+    piece = 3
+    step = len(feature_dir_aes_arr) // piece
+    aes_start = [start for start in range(0, len(feature_dir_aes_arr), step)]
+    des3_start = [start for start in range(0, len(feature_dir_des3_arr), step)]
+
     counter = 0
     writer = SummaryWriter()
     for round in range(5):
-        for i in range(23):
+        for i in range(1,24):
             dataset_arr = []
-            dataset_arr.append(DataSet_csv(0, feature_dir_aes_arr[i]))
-            dataset_arr.append(DataSet_csv(1, feature_dir_des3_arr[i]))
+            dataset_arr.append(DataSet_np(0, feature_dir_aes_arr[aes_start[i]: aes_start[i]+step], in_channel=8))
+            dataset_arr.append(DataSet_np(1, feature_dir_des3_arr[des3_start[i]: des3_start[i]+step], in_channel=8))
             dataset = data.ConcatDataset(dataset_arr)
-            dataloader = DataLoader(dataset, 128, True, num_workers=8)
-            loss = train(resnet, dataloader, epoch=1)
-            print("round : " , round)
-            print(" data_batch : ", i)
-            print(" loss: ", loss)
-            writer.add_scalar('Loss/train', loss, counter)
-            counter += 1
-    torch.save(resnet, "/root/trainedmodel/resnet18_AES_DES3_ECB_full_32.model")
+            dataloader = DataLoader(dataset, 16, True, num_workers=8)
+            print("round : " , round+1)
+            print(" data_batch : ", i+1)
+            loss_arr = train(resnet, dataloader, epoch=5)
+            for loss in loss_arr:
+                writer.add_scalar('Loss/train', loss, counter)
+                counter += 1
+
+
+    # resnet = torch.load("/root/trainedmodel/resnet18_AES_DES3_ECB_mini_256_in8.model").to(device)
+    # dataset_arr = []
+    # dataset_arr.append(DataSet_np(0, feature_dir_aes_arr, in_channel=8))
+    # dataset_arr.append(DataSet_np(1, feature_dir_des3_arr, in_channel=8))
+    # dataset = data.ConcatDataset(dataset_arr)
+    # dataloader = DataLoader(dataset, 16, True, num_workers=8)
+    # train(resnet, dataloader, epoch=10, tensorboard=True)
+    # torch.save(resnet, "/root/trainedmodel/resnet18_AES_DES3_ECB_mini_256_in8.model")
 
     # lazyLoadAndTrain(resnet, train_partial, 256, feature_dir_dict, 6, 24, 36, 8, "/root/trainedmodel/resnet18.model")
     # des3_data = preprocess.DataSet(1, preprocess.getFeature_ray(cipherDir_des, preprocess.bitcount, 224))

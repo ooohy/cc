@@ -15,7 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 
 
-def train(model, dataloader, epoch=1, criterion_name="CrossEntropyLoss", optimizer_name="SGD", lr=0.05, momentum=0.8, modelPath=None, lazyloading=False, tensorboard=False):
+def train(model, dataloader, epoch=1, criterion_name="CrossEntropyLoss", optimizer_name="SGD", lr=0.01, momentum=0.8, modelPath=None, lazyloading=False, tensorboard=False):
     writer = SummaryWriter()
     if criterion_name == "CrossEntropyLoss":
         criterion = nn.CrossEntropyLoss()

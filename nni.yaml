@@ -1,0 +1,16 @@
+experimentName: train_resnet101     # 用于区分 experiment 的名字，可选项
+trialCommand: python3 trainResNet.py      # 注意：如果使用 Windows，请将 "python3" 修改为 "python"
+trialConcurrency: 2
+maxTrialNumber: 10                  # 最多生成 10 个 trial
+maxExperimentDuration: 1h           # 1 小时后停止生成 trial
+tuner:                              # 配置调优算法
+  name: TPE
+  classArgs:                       # 算法特定参数
+    optimize_mode: minimize
+trainingService:                    # 配置训练平台
+  platform: local
+useAnnotation: true
+trial:
+  gpuNum: 1
+localConfig:
+  maxTrialNumPerGpu:  2

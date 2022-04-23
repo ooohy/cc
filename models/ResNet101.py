@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+from torchsummary import summary
 
 
 __all__ = ['ResNet50', 'ResNet101','ResNet152']
@@ -104,8 +105,9 @@ def ResNet152():
 if __name__=='__main__':
     #model = torchvision.models.resnet50()
     model = ResNet101()
-    print(model)
+    summary(model, (1, 224, 224))
+    # print(model)
 
-    input = torch.randn(1, 1, 224, 224)
-    out = model(input)
-    print(out.shape)
+    # input = torch.randn(1, 1, 224, 224)
+    # out = model(input)
+    # print(out.shape)

@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
     counter = 0
     writer = SummaryWriter()
-    for round in range(5):
+    for round in range(10):
         for i in range(1,24):
             dataset_arr = []
             dataset_arr.append(DataSet_np(0, feature_dir_aes_arr[aes_start[i]: aes_start[i]+step], in_channel=8))

@@ -18,6 +18,7 @@ import modin.pandas as pd
 from bitarray.util import urandom
 from cipher import des, aes
 
+
 def file2cipher(file_dir, targetDir, encrypt, label, file_percent=1):
     """
     fileDir: the directory of the file to be encrypted
@@ -292,6 +293,14 @@ def generate_random_num(length):
                 for i in range(length)]
     random_str = "".join(str_list)
     return random_str
+
+class DataSet_rand_rnn(data.Dataset):
+    def __init__(self, label, encoder, num_workers=24):
+        urandom()
+
+
+        urandom
+
 
 
 if __name__ == '__main__':

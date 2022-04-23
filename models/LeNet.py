@@ -10,6 +10,7 @@ Modified By: ysy (1424535213@qq.com>)
 May force be with you !
 '''
 
+from re import L
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -44,7 +45,29 @@ class LeNet(nn.Module) :
         x = self.fc3(x)
         return x 
 
+# class LeNet_lstm(nn.Module) :
+#     def __init__(self):
+#         super(LeNet_lstm, self).__init__()
+#         self.conv1 = nn.Conv2d(1, 6, 5)
+#         self.conv2 = nn.Conv2d(6, 16, 5)
+#         self.conv3 = nn.Conv2d(16, 120, 5)
+#         self.fc1 = nn.Linear(8 * 59536, 3000)
+#         self.fc2 = nn.Linear(3000, 120)
+#         self.fc3 = nn.Linear(120, 84)
+#         self.fc4 = nn.Linear(84, 2)
+#         # self.fc3 = nn.Linear(84, 10)
 
+
+#     def forward(self, x):
+
+#         x = F.max_pool2d(F.relu(self.conv1(x)), kernel_size = 2, stride = 2)
+#         x = F.max_pool2d(F.relu(self.conv2(x)), kernel_size = 2, stride = 2)
+#         x = x.view(x.size()[0], -1)
+#         x = F.relu(self.fc1(x))
+#         x = F.relu(self.fc2(x))
+#         x = F.relu(self.fc3(x))
+#         x = self.fc4(x)
+#         return x
 # train_LeNet, optimizer MSE
 
 def trainLeNet(lenet, dataloader, epoch = 5) :
@@ -90,3 +113,8 @@ def testLeNet(lenet, dataloader) :
     print('Accuracy of the network on the 10000 test images: %d %%' % (
         100 * correct / total))
     
+if __name__ == '__main__':
+    cnn = LeNet_lstm()
+    a = torch.rand(8, 1, 256, 256)
+    b = cnn(a)
+    print(b.shape)

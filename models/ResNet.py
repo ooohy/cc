@@ -30,9 +30,9 @@ def make_layer18(in_channel, out_channel, block_num, stride=1):
         nn.Conv2d(in_channel, out_channel, 1, stride),  # 尺寸不变
         nn.BatchNorm2d(out_channel)
     )
-    layers = list()
-    layers.append(ResBlock18(in_channel, out_channel, stride, shortcut))
-
+   
+   
+   
     for i in range(1, block_num):
         layers.append(ResBlock18(out_channel, out_channel))
     return nn.Sequential(*layers)

@@ -21,12 +21,13 @@ import time
 import gc
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
-import utils
-from torchsummary import summary
+from utils import batchVal
 
 from complexPyTorch.complexLayers import ComplexBatchNorm2d, ComplexConv2d, ComplexLinear, ComplexMaxPool2d, ComplexReLU
 from complexPyTorch.complexFunctions import complex_relu, complex_max_pool2d
 from torch.nn import CrossEntropyLoss
+from torch.nn import ReLU
+
 
 
 class DataSet_complex(Dataset):
@@ -58,17 +59,19 @@ class DataSet_complex(Dataset):
         ba.frombytes(self.encryptor.encrypt(urandom(total_len).tobytes()))
         cipher_complex_np_arr = [fft(np.array(ba[p: p+bitwise].tolist(), dtype=np.float32)) for p in range(0, total_len, bitwise)]
         cipher_complex_np = np.stack(cipher_complex_np_arr, axis=0) 
-        cipher_pt = torch.from_numpy(cipher_complex_np).reshape(-1, bitwise, mat_size, mat_size) # (batch_size, bitwise_in_channel)
+        cipher_complex_np = np.transpose(cipher_complex_np, (1, 0))
+        cipher_pt = torch.from_numpy(cipher_complex_np).reshape(-1, mat_size, mat_size, bitwise) # (batch_size, bitwise_in_channel)
+        cipher_pt = cipher_pt.permute(0, 3, 1, 2)
         # cipher_complex_np = fft(np.array(ba[:total_len].tolist()))
         # ba_count = [ba[p: p+bitwise].count(1) for p in range(0, total_len, bitwise)]
 
         return cipher_pt
     
     def get_mat_batch(self, size):
-        # cipher_pt_arr = Parallel(n_jobs=self.num_workers)(delayed(self.process)(384, 8, 32) for i in range(size))
-        cipher_pt_arr = []
-        for i in range(size):
-            cipher_pt_arr.append(self.process(128, 8, 256))
+        cipher_pt_arr = Parallel(n_jobs=self.num_workers)(delayed(self.process)(224, 8, 128) for i in range(size))
+        # cipher_pt_arr = []
+        # for i in range(size):
+        #     cipher_pt_arr.append(self.process(128, 8, 256))
         return torch.cat(cipher_pt_arr, 0)
 
 class ResBlock(nn.Module):
@@ -102,7 +105,6 @@ class ResNet18(nn.Module):
             ComplexConv2d(in_channels, 64, kernel_size=7, stride=2, padding=3),
             ComplexMaxPool2d(kernel_size=3, stride=2, padding=1),
             ComplexBatchNorm2d(64),
-            ComplexReLU()
         )
 
         self.layer1 = nn.Sequential(
@@ -131,6 +133,7 @@ class ResNet18(nn.Module):
 
     def forward(self, x):
         x = self.layer0(x)
+        x = complex_relu(x)
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
@@ -143,44 +146,59 @@ class ResNet18(nn.Module):
 
 
 if __name__ == '__main__':
-    dataset = DataSet_complex(1, 1, 1)
-    dataset_des = des
-    resnet = ResNet18(8, ResBlock, num_class=2)
-    dataloader = DataLoader(dataset, batch_size=2, shuffle=True, num_workers=1)
+    torch.multiprocessing.set_start_method('spawn')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # resnet = ResNet18(8, ResBlock, num_class=2).to(device)
+    resnet = torch.load('/root/trainedmodel/ResNet18_AES_DES3_ECB_COMPLEX_2.model')
     writer = SummaryWriter()
     criterion = nn.CrossEntropyLoss()
     opt = torch.optim.Adadelta(resnet.parameters())
-
+    counter = 0
 
     # summary(resnet, (8, 256, 256))
-    for epoch in range(10):  # loop over the dataset multiple times
+    for epoch in range(40):  # loop over the dataset multiple times
+        dataset_AES = DataSet_complex(1, 24, 24)
+        dataset_TEDS = DataSet_complex(0, 24, 24)
+        dataset = ConcatDataset([dataset_AES, dataset_TEDS])
+        dataloader = DataLoader(dataset, batch_size=48, shuffle=True, num_workers=8, drop_last=True)
         running_loss = 0.0
-        for i, data in enumerate(dataloader, 0):
-            # get the inputs; data is a list of [inputs, labels]
-            inputs, labels = data
 
-            # zero the parameter gradients
-            opt.zero_grad()
+        # val before train
+        correct, sum = batchVal(resnet, dataloader)
+        writer.add_scalar('val/train', correct/sum, counter)
 
-            # forward + backward + optimize
-            outputs = resnet(inputs)
 
-            # transform to real
-            outputs = torch.view_as_real(outputs)
-            outputs = outputs.norm(p=2, dim=2)
-            
-            loss = criterion(outputs, labels)
-            loss.backward()
-            opt.step()
+        for round in range(1):
+            print("epoch, round: ", epoch, round)
+            for i, data in enumerate(dataloader, 0):
 
-           # print statistics
-            last_loss = 0
-            running_loss += loss.item()
-            if i % 50 == 49:    # print every 2000 mini-batches
-                print('[%d, %5d] loss: %.3f' %
-                (epoch, i + 1, running_loss / 50))
-                print("  >>  ", time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
-                    # last_loss = running_loss
-                last_loss = running_loss / 50 
-                running_loss = 0.0
-        print("epoch", epoch)
+                # get the inputs; data is a list of [inputs, labels]
+                inputs, labels = data
+
+                # zero the parameter gradients
+                opt.zero_grad()
+
+                # forward + backward + optimize
+                outputs = resnet(inputs)
+
+                # transform to real
+                outputs = torch.view_as_real(outputs)
+                outputs = outputs.norm(p=2, dim=2)
+                
+                loss = criterion(outputs, labels)
+                loss.backward()
+                opt.step()
+
+            # print statistics
+                last_loss = 0
+                running_loss += loss.item()
+                if i % 50 == 49:    # print every 2000 mini-batches
+                    print('[%d, %5d] loss: %.3f' %
+                    (epoch, i + 1, running_loss / 50))
+                    print("  >>  ", time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
+                        # last_loss = running_loss
+                    writer.add_scalar('Loss/train', running_loss / 50, counter)
+                    counter+=1
+                    last_loss = running_loss / 50 
+                    running_loss = 0.0
+    torch.save(resnet, "/root/trainedmodel/ResNet18_AES_DES3_ECB_COMPLEX_3.model")
